@@ -1,18 +1,12 @@
+# %%
 import re
-from pathlib import Path
-import argparse
 from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 import time
-import google.generativeai as genai
 import random
-
-def setup_gemini(api_key):
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-pro')
-    return model
-
+import google.generativeai as genai
+import os
 def get_random_user_agent():
     user_agents = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -56,9 +50,13 @@ def scrape_url_content(url):
         print(f"Error scraping {url}: {str(e)}")
         return ""
 
-def extract_info_with_gemini(model, url, content):
+def extract_author_and_year(content, url, api_key):
     """Extract author and year information using Gemini."""
     try:
+        # Configure Gemini
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel()
+        
         if not content:
             domain = urlparse(url).netloc
             return domain.replace('www.', '').split('.')[0].title(), 'Unknown'
@@ -102,53 +100,58 @@ Content:
         domain = urlparse(url).netloc
         return domain.replace('www.', '').split('.')[0].title(), 'Unknown'
 
-def process_citation(citation, model):
-    """Process a single citation line and return the formatted version."""
-    # Extract components using regex
-    pattern = r'(\d+)\.\s+(.+?)\s+\|\s+(.+?),\s+consulté le\s+(.+?),\s+(https?://\S+)'
-    match = re.match(pattern, citation.strip())
+def extract_urls(url: str, api_key: str) -> tuple:
+    """return the author and publication year of the url
     
-    if not match:
-        return citation
+    1. get the content of the url
+    2. extract the author and publication year with gemini
+    3. return the author and publication year
     
-    number, title, source, date, url = match.groups()
-    
-    # Get content and extract information using Gemini
+    """
+
+    # get the content of the url
     content = scrape_url_content(url)
-    author, year = extract_info_with_gemini(model, url, content)
-    
-    # Format the new citation
-    formatted = f"{number}. {title} | {source}, consulté le {date}, {url}, ([{author}, {year}]({url}))"
-    
-    return formatted
 
-def process_citations_file(input_file, output_file, api_key):
-    """Process all citations in the input file and write to output file."""
-    # Setup Gemini
-    model = setup_gemini(api_key)
+    # extract the author and publication year with gemini
+    author, year = extract_author_and_year(content, url, api_key)
     
-    # Read input file
-    content = Path(input_file).read_text()
-    
-    # Process each line
-    processed_lines = []
-    for line in content.split('\n'):
-        if line.strip():
-            processed_line = process_citation(line, model)
-            processed_lines.append(processed_line)
-            print(f"Processed citation: {line[:50]}...")
-    
-    # Write output
-    Path(output_file).write_text('\n'.join(processed_lines))
+    # Format the output as a markdown citation with author, year, and URL
+    formatted_output = f"([{author}, {year}]({url}))"
+    return formatted_output
 
+# %%
+def extract_urls_from_file(file_path: str, api_key: str) -> list:
+    """for each line in the path:
+    1. extract the url
+    2. use the extract_urls function to get the author and publication year
+    3. replace the url in the line with output of the extract_urls function
+    """
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    new_lines = []
+    for line in lines:
+        # Extract URL from the line using regex
+        url_match = re.search(r'https?://[^\s,)]+', line.strip())
+        url = url_match.group(0) if url_match else None
+        if url:
+            author_year = extract_urls(url, api_key)
+            line = line.replace(url, author_year)
+            new_lines.append(line)
+    return new_lines
+
+
+# %%
 def main():
-    parser = argparse.ArgumentParser(description='Process citation format')
-    parser.add_argument('input_file', help='Input file containing citations')
-    parser.add_argument('output_file', help='Output file for processed citations')
-    parser.add_argument('--api-key', required=True, help='Gemini API key')
-    
-    args = parser.parse_args()
-    process_citations_file(args.input_file, args.output_file, args.api_key)
+    """main function"""
+    api_key = os.getenv("GEMINI_API_KEY")
+    file_path = "input.md"
+    output_path = "output.md"
+    lines = extract_urls_from_file(file_path, api_key)
+    with open(output_path, 'w') as file:
+        file.writelines(lines)
 
 if __name__ == "__main__":
-    main() 
+    main()
+
+# %%
