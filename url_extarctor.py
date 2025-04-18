@@ -7,6 +7,8 @@ import time
 import random
 import google.generativeai as genai
 import os
+from tqdm import tqdm
+
 def get_random_user_agent():
     user_agents = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -130,7 +132,8 @@ def extract_urls_from_file(file_path: str, api_key: str) -> list:
         lines = file.readlines()
 
     new_lines = []
-    for line in lines:
+    just_author_years = []
+    for line in tqdm(lines):
         # Extract URL from the line using regex
         url_match = re.search(r'https?://[^\s,)]+', line.strip())
         url = url_match.group(0) if url_match else None
@@ -138,18 +141,74 @@ def extract_urls_from_file(file_path: str, api_key: str) -> list:
             author_year = extract_urls(url, api_key)
             line = line.replace(url, author_year)
             new_lines.append(line)
-    return new_lines
+            just_author_years.append(author_year)
+        else:
+            new_lines.append(line)
+            just_author_years.append(None)
+    return new_lines, just_author_years
 
+
+
+def replace_sources_with_author_year(file_body_path: str, just_author_years: list, api_key: str) -> str:
+    """replace all the sources with the author and publication year and url
+
+    For example:
+    Robust Security: Strong cybersecurity is paramount to prevent model theft, data poisoning, unauthorized access, or infrastructure compromise, which could all lead to safety failures or misuse.244
+    should be replaced with:
+    Robust Security:  Strong cybersecurity is paramount to prevent model theft, data poisoning, unauthorized access, or infrastructure compromise, which could all lead to safety failures or misuse ([Robust Security, 2024](https://www.robustsecurity.com/)).
+    
+    1. open the file and convert it to a string
+    1.5 ask gemini 2.5 pro to add a X in front of all the sources numbers (that are not numbers in themselves)
+    2. iterate over i, just_author_years list
+        search for occurences of the source number i, in the format of a letter followed by a period and the number i
+        for example: "s.34"
+        if found, replace all occurences with the just_author_year[i] followed by a period.
+    3. return the new string
+    
+    """
+    with open(file_body_path, 'r') as file:
+        text = file.read()
+
+    # ask gemini 2.5 pro to add a X in front of all the sources numbers (that are not numbers in themselves)
+    prompt = f"""
+    recopy entirely the following text by adding an X just before all the numbers that are representing sources.
+
+    For example "AI Safety Support Links 272" should become "AI Safety Support Links X272"
+
+    but "AI Management Systems (e.g., ISO 42001)" should remain "AI Management Systems (e.g., ISO 42001)"
+
+
+    {text}
+    """
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel()
+    response = model.generate_content(prompt)
+    text = response.text
+    for source_i, author_year in enumerate(just_author_years):
+        if author_year:
+            pattern = rf'X{source_i}'
+            text = re.sub(pattern, author_year + '.', text)
+    return text
+    
 
 # %%
 def main():
     """main function"""
     api_key = os.getenv("GEMINI_API_KEY")
-    file_path = "input.md"
-    output_path = "output.md"
-    lines = extract_urls_from_file(file_path, api_key)
-    with open(output_path, 'w') as file:
+
+    # extract the author and publication year from the urls
+    input_source_path = "input_sources.md"
+    output_source_path = "output_sources.md"
+    lines, just_author_years = extract_urls_from_file(input_source_path, api_key)
+    with open(output_source_path, 'w') as file:
         file.writelines(lines)
+
+    # replace the body of the text with the author and publication year and url
+    input_body_path = "input_body.md"
+    output_body_path = "output_body.md"
+    text = replace_sources_with_author_year(input_body_path, just_author_years, api_key)
+    with open(output_body_path, 'w') as file:
+        file.write(text)
 
 if __name__ == "__main__":
     main()
