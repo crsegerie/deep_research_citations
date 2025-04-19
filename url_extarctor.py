@@ -143,7 +143,6 @@ def extract_urls_from_file(file_path: str, api_key: str) -> list:
     2. use the extract_urls function to get the author and publication year
     3. replace the url in the line with output of the extract_urls function
     """
-    skipped_urls = []
     with open(file_path, 'r') as file:
         lines = file.readlines()
 
@@ -188,7 +187,7 @@ def replace_sources_with_author_year(file_body_path: str, just_author_years: lis
     for source_i, author_year in enumerate(just_author_years):
         print(source_i, author_year)
         if author_year:
-            pattern = rf'X{source_i}\b'
+            pattern = rf'X{source_i + 1}\b'
             text = re.sub(pattern, author_year + '.', text)
     return text
     
