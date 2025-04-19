@@ -155,12 +155,11 @@ def replace_sources_with_author_year(file_body_path: str, just_author_years: lis
     """replace all the sources with the author and publication year and url
 
     For example:
-    Robust Security: Strong cybersecurity is paramount to prevent model theft, data poisoning, unauthorized access, or infrastructure compromise, which could all lead to safety failures or misuse.244
+    Robust Security: Strong cybersecurity is paramount to prevent model theft, data poisoning, unauthorized access, or infrastructure compromise, which could all lead to safety failures or misuse.X244
     should be replaced with:
     Robust Security:  Strong cybersecurity is paramount to prevent model theft, data poisoning, unauthorized access, or infrastructure compromise, which could all lead to safety failures or misuse ([Robust Security, 2024](https://www.robustsecurity.com/)).
     
     1. open the file and convert it to a string
-    1.5 ask gemini 2.5 pro to add a X in front of all the sources numbers (that are not numbers in themselves)
     2. iterate over i, just_author_years list
         search for occurences of the source number i, in the format of a letter followed by a period and the number i
         for example: "s.34"
@@ -171,21 +170,6 @@ def replace_sources_with_author_year(file_body_path: str, just_author_years: lis
     with open(file_body_path, 'r') as file:
         text = file.read()
 
-    # ask gemini 2.5 pro to add a X in front of all the sources numbers (that are not numbers in themselves)
-    prompt = f"""
-    recopy entirely the following text by adding an X just before all the numbers that are representing sources.
-
-    For example "AI Safety Support Links 272" should become "AI Safety Support Links X272"
-
-    but "AI Management Systems (e.g., ISO 42001)" should remain "AI Management Systems (e.g., ISO 42001)"
-
-
-    {text}
-    """
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel()
-    response = model.generate_content(prompt)
-    text = response.text
     for source_i, author_year in enumerate(just_author_years):
         print(source_i, author_year)
         if author_year:
