@@ -1,13 +1,14 @@
 # %%
 import re
 from urllib.parse import urlparse
-import requests
+import cloudscraper  # Replace requests with cloudscraper
 from bs4 import BeautifulSoup
 import time
 import random
 import google.generativeai as genai
 import os
 from tqdm import tqdm
+import backoff
 
 def get_random_user_agent():
     user_agents = [
@@ -18,52 +19,67 @@ def get_random_user_agent():
     ]
     return random.choice(user_agents)
 
+@backoff.on_exception(
+    backoff.expo,
+    (Exception),  # Catch all exceptions for cloudscraper
+    max_tries=3,
+    jitter=backoff.full_jitter
+)
 def scrape_url_content(url):
-    """Scrape content from URL with error handling and rate limiting."""
-    try:
-        headers = {
-            'User-Agent': get_random_user_agent(),
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
+    """Scrape content from URL with automatic retries and exponential backoff."""
+    # Create a cloudscraper session
+    scraper = cloudscraper.create_scraper(
+        browser={
+            'browser': 'chrome',
+            'platform': 'windows',
+            'desktop': True
         }
+    )
+    
+    headers = {
+        'User-Agent': get_random_user_agent(),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+    }
+    
+    # Basic rate limiting
+    time.sleep(random.uniform(2, 4))
+    
+    response = scraper.get(url, headers=headers, timeout=15)
+    response.raise_for_status()
+    
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # Remove script and style elements
+    for script in soup(["script", "style"]):
+        script.decompose()
         
-        # Add random delay to avoid rate limiting
-        time.sleep(random.uniform(1, 3))
-        
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Remove script and style elements
-        for script in soup(["script", "style"]):
-            script.decompose()
-            
-        # Get text content
-        text = soup.get_text()
-        
-        # Clean up whitespace
-        lines = (line.strip() for line in text.splitlines())
-        text = ' '.join(line for line in lines if line)
-        
-        return text
-        
-    except Exception as e:
-        print(f"Error scraping {url}: {str(e)}")
-        return ""
+    # Get text content
+    text = soup.get_text()
+    
+    # Clean up whitespace
+    lines = (line.strip() for line in text.splitlines())
+    text = ' '.join(line for line in lines if line)
+    
+    return text
 
+@backoff.on_exception(
+    backoff.constant,  # Use constant backoff for Gemini API
+    Exception,  # This will catch any Gemini API errors
+    interval=60,  # Wait 60 seconds between retries
+    max_tries=3,
+    jitter=backoff.full_jitter
+)
 def extract_author_and_year(content, url, api_key):
-    """Extract author and year information using Gemini."""
-    try:
-        # Configure Gemini
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel()
+    """Extract author and year information using Gemini with automatic retries."""
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel()
+    
+    if not content:
+        domain = urlparse(url).netloc
+        return domain.replace('www.', '').split('.')[0].title(), 'Unknown'
         
-        if not content:
-            domain = urlparse(url).netloc
-            return domain.replace('www.', '').split('.')[0].title(), 'Unknown'
-            
-        prompt = f"""Given this webpage content from {url}, extract the following information:
+    prompt = f"""Given this webpage content from {url}, extract the following information:
 1. Author name (if available)
 2. Publication year (4-digit year, e.g. 2024)
 
@@ -77,47 +93,44 @@ Keep only the name of the main author. Add et al. if there are multiple authors.
 Content:
 {content[:10000]}
 """
-        response = model.generate_content(prompt)
-        response_text = response.text
-        
-        # Parse the response
-        author_match = re.search(r'Author: (.+)', response_text)
-        year_match = re.search(r'Year: (.+)', response_text)
-        
-        author = author_match.group(1) if author_match else None
-        year = year_match.group(1) if year_match else None
-        
-        # Fallbacks if Gemini couldn't find the information
-        if not author or author == 'Unknown':
-            domain = urlparse(url).netloc
-            author = domain.replace('www.', '').split('.')[0].title()
-        
-        if not year or year == 'Unknown':
-            # Try to extract year from URL or default to consultation year
-            year_match = re.search(r'/(\d{4})/', url)
-            year = year_match.group(1) if year_match else 'Unknown'
-            
-        return author.strip(), year.strip()
-        
-    except Exception as e:
-        print(f"Error processing with Gemini for {url}: {str(e)}")
+    
+    # Basic rate limiting for Gemini API
+    time.sleep(4)
+    
+    response = model.generate_content(prompt)
+    response_text = response.text
+    
+    # Parse the response
+    author_match = re.search(r'Author: (.+)', response_text)
+    year_match = re.search(r'Year: (.+)', response_text)
+    
+    author = author_match.group(1) if author_match else None
+    year = year_match.group(1) if year_match else None
+    
+    # Fallbacks if Gemini couldn't find the information
+    if not author or author == 'Unknown':
         domain = urlparse(url).netloc
-        return domain.replace('www.', '').split('.')[0].title(), 'Unknown'
+        author = domain.replace('www.', '').split('.')[0].title()
+    
+    if not year or year == 'Unknown':
+        year_match = re.search(r'/(\d{4})/', url)
+        year = year_match.group(1) if year_match else 'Unknown'
+        
+    return author.strip(), year.strip()
 
 def extract_urls(url: str, api_key: str) -> tuple:
-    """return the author and publication year of the url
-    
-    1. get the content of the url
-    2. extract the author and publication year with gemini
-    3. return the author and publication year
-    
-    """
-
-    # get the content of the url
-    content = scrape_url_content(url)
-
-    # extract the author and publication year with gemini
-    author, year = extract_author_and_year(content, url, api_key)
+    """return the author and publication year of the url, or a fallback if scraping fails"""
+    try:
+        # get the content of the url
+        content = scrape_url_content(url)
+        # extract the author and publication year with gemini
+        author, year = extract_author_and_year(content, url, api_key)
+    except Exception as e:
+        print(f"\nSkipping {url} due to error: {str(e)}")
+        # Fallback: use domain name as author
+        domain = urlparse(url).netloc
+        author = domain.replace('www.', '').split('.')[0].title()
+        year = 'Unknown'
     
     # Format the output as a markdown citation with author, year, and URL
     formatted_output = f"([{author}, {year}]({url}))"
@@ -130,6 +143,7 @@ def extract_urls_from_file(file_path: str, api_key: str) -> list:
     2. use the extract_urls function to get the author and publication year
     3. replace the url in the line with output of the extract_urls function
     """
+    skipped_urls = []
     with open(file_path, 'r') as file:
         lines = file.readlines()
 
@@ -147,6 +161,7 @@ def extract_urls_from_file(file_path: str, api_key: str) -> list:
         else:
             new_lines.append(line)
             just_author_years.append(None)
+    
     return new_lines, just_author_years
 
 
