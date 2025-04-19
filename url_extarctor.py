@@ -72,6 +72,8 @@ Format your response exactly like this example:
 Author: John Doe
 Year: 2024
 
+Keep only the name of the main author. Add et al. if there are multiple authors.
+
 Content:
 {content[:10000]}
 """
@@ -185,8 +187,9 @@ def replace_sources_with_author_year(file_body_path: str, just_author_years: lis
     response = model.generate_content(prompt)
     text = response.text
     for source_i, author_year in enumerate(just_author_years):
+        print(source_i, author_year)
         if author_year:
-            pattern = rf'X{source_i}'
+            pattern = rf'X{source_i}\b'
             text = re.sub(pattern, author_year + '.', text)
     return text
     
