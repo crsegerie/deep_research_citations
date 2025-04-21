@@ -200,6 +200,37 @@ def split_the_body(body_text, custom_string):
     
     return body, sources
 
+@backoff.on_exception(
+    backoff.constant,  # Use constant backoff for Gemini API
+    Exception,  # This will catch any Gemini API errors
+    interval=60,  # Wait 60 seconds between retries
+    max_tries=3,
+    jitter=backoff.full_jitter
+)
+def add_x_to_source_numbers(text, api_key):
+    """
+    Use Gemini 2.5 Pro to add an X before source reference numbers in text.
+    This makes it easier to identify and replace source numbers later.
+    """
+    prompt = f"""
+    recopy entirely the following text by adding an X just before all the numbers that are representing sources.
+
+    For example "AI Safety Support Links 272" should become "AI Safety Support Links X272"
+
+    but "AI Management Systems (e.g., ISO 42001)" should remain "AI Management Systems (e.g., ISO 42001)"
+
+
+    {text}
+    """
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-2.5-pro")
+    
+    # Basic rate limiting for Gemini API
+    time.sleep(4)
+    
+    response = model.generate_content(prompt)
+    return response.text
+
 # Streamlit UI
 st.title("URL Extraction and Citation Formatter")
 
@@ -221,12 +252,18 @@ tab1, tab2 = st.tabs(["Direct Text Input", "File Upload"])
 with tab1:
     body_text = st.text_area("Input Body (Paste your research text here), in markdown format, with the references at the end of the text", height=300)
     reference_marker = st.text_input("Reference Section Marker", value="Sources des citations")
+    preprocess_text = st.checkbox("Preprocess text to add 'X' before source numbers", value=True, help="Uses Gemini to add an 'X' before source numbers to make them easier to identify")
     
     if st.button("Process Text", disabled=not api_key):
         if body_text:
             with st.spinner("Processing document..."):
                 # Split the body
                 body, sources = split_the_body(body_text, reference_marker)
+                
+                # Preprocess body to add X before source numbers if requested
+                if preprocess_text:
+                    with st.spinner("Preprocessing text with Gemini..."):
+                        body = add_x_to_source_numbers(body, api_key)
                 
                 # Process sources
                 if sources:
@@ -251,6 +288,7 @@ with tab1:
 with tab2:
     uploaded_file = st.file_uploader("Upload a Markdown File", type=["md", "txt"])
     reference_marker = st.text_input("Reference Section Marker ", value="Sources des citations")
+    preprocess_text = st.checkbox("Preprocess file to add 'X' before source numbers", value=True, help="Uses Gemini to add an 'X' before source numbers to make them easier to identify")
     
     if uploaded_file is not None and st.button("Process File", disabled=not api_key):
         with st.spinner("Processing file..."):
@@ -266,6 +304,11 @@ with tab2:
             # Split the body
             body, sources = split_the_body(file_content, reference_marker)
             
+            # Preprocess body to add X before source numbers if requested
+            if preprocess_text:
+                with st.spinner("Preprocessing text with Gemini..."):
+                    body = add_x_to_source_numbers(body, api_key)
+                
             # Process sources
             if sources:
                 formatted_sources, author_years = extract_urls_from_text(sources, api_key)
