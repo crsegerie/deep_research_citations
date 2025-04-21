@@ -192,21 +192,59 @@ def replace_sources_with_author_year(file_body_path: str, just_author_years: lis
     return text
     
 
+
+def number_sources(file_body_path: str) -> int:
+    """Extract the number of sources in the file by taking the last line of the file, and extracting the number before the first period """
+    with open(file_body_path, 'r') as file:
+        last_line = file.readlines()[-1]
+    N_sources = int(last_line.split('.')[0])
+    print(f"Number of sources: {N_sources}")
+    assert N_sources > 20, f"Number of sources in the file ({N_sources}) is less than 20, this is probably wrong. The last line of the file should be a number followed by a period."
+    return N_sources
+
+
+def split_the_body(file_body_path: str, custom_string: str, file_sources_name: str = 'input_sources.md') -> list:
+    """split the body of the text between the body and at the end the sources, by the line that starts with 'References' or a custom string"""
+    with open(file_body_path, 'r') as file:
+        lines = file.readlines()
+
+    # find the line that starts with 'References' or a custom string
+    for i, line in enumerate(lines):
+        if custom_string in line:
+            break
+    lines = lines[i+1:]
+    
+    # filter out empty lines
+    lines = [line for line in lines if line.strip()]
+
+    # write the source file
+    with open(file_sources_name, 'w') as file:
+        file.writelines(lines)
+    return lines
+
+
 # %%
 def main():
     """main function"""
     api_key = os.getenv("GEMINI_API_KEY")
 
     # extract the author and publication year from the urls
+    input_body_path = "input_body.md"
+
+    # Those files are going to be created by the script
     input_source_path = "input_sources.md"
     output_source_path = "output_sources.md"
+    output_body_path = "output_body.md"
+
+    # split the body of the text between the body and at the end the sources, by the line that starts with 'References' or a custom string
+    split_the_body(input_body_path, custom_string='Sources des citations', file_sources_name=input_source_path)
+
+    # extract the author and publication year from the urls
     lines, just_author_years = extract_urls_from_file(input_source_path, api_key)
     with open(output_source_path, 'w') as file:
         file.writelines(lines)
 
     # replace the body of the text with the author and publication year and url
-    input_body_path = "input_body.md"
-    output_body_path = "output_body.md"
     text = replace_sources_with_author_year(input_body_path, just_author_years, api_key)
     with open(output_body_path, 'w') as file:
         file.write(text)
