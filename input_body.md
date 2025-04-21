@@ -162,10 +162,10 @@ This schema illustrates how an API works. This diagram is very simplified and is
 
 ### **Technical Safeguards within Models**
 
-Beyond access control, researchers are developing techniques to build safety mechanisms directly into the models themselves or their deployment pipelines.
+Beyond access control and instruction tuning techniques like RLHF, researchers are developing techniques to build safety mechanisms directly into the models themselves or their deployment pipelines.
 
-  - **Circuit Breakers:** Inspired by representation engineering, circuit breakers aim to detect and interrupt the internal activation patterns associated with harmful outputs as they form.X86 By "rerouting" these harmful representations (e.g., using Representation Rerouting with LoRRA), this technique can prevent the generation of harmful content, demonstrating robustness against unseen adversarial attacks while potentially preserving model utility.X86 This approach targets the model's intrinsic capacity for harm, making it potentially more robust than input/output filtering.X86
-  - **Machine Unlearning:** This involves techniques to selectively remove specific knowledge or capabilities from a trained model without full retraining.X87 Applications relevant to misuse prevention include removing knowledge about dangerous substances or weapons X89, erasing harmful biases, or removing jailbreak vulnerabilities.X89 Techniques range from gradient-based methods to parameter modification and model editing.X87 However, challenges remain in ensuring complete and robust forgetting, evaluating success, avoiding catastrophic forgetting of useful knowledge, and scaling these methods efficiently.X87
+  - **Circuit Breakers:** Inspired by representation engineering, circuit breakers aim to detect and interrupt the internal activation patterns associated with harmful outputs as they form.X86 By "rerouting" these harmful representations (e.g., using Representation Rerouting with LoRRA), this technique can prevent the generation of harmful content, demonstrating robustness against unseen adversarial attacks while potentially preserving model utility.X86 This approach targets the model's intrinsic capacity for harm, making it potentially more robust than input/output filtering. TODO: Add a diagram
+  - **Machine Unlearning:** This involves techniques to selectively remove specific knowledge or capabilities from a trained model without full retraining.X87 Applications relevant to misuse prevention include removing knowledge about dangerous substances or weapons X89, erasing harmful biases, or removing jailbreak vulnerabilities.X89 Techniques range from gradient-based methods to parameter modification and model editing.X87 However, challenges remain in ensuring complete and robust forgetting, avoiding catastrophic forgetting of useful knowledge, and scaling these methods efficiently.
 
 ### **Box: The impossible challenge of creating tamper resistant safeguards**
 
@@ -173,7 +173,7 @@ A major challenge for open-weight models is that adversaries can fine-tune them 
 
 **Why can't we simply instruction-tune powerful models and then release them as open weight?** Once a model is freely accessible, even if it has been fine-tuned to include security filters, removing these filters is relatively straightforward. Moreover, recent studies have shown that a few hundred euros are sufficient to bypass all safety barriers currently in place on available open-source models simply by fine-tuning the model with a few toxic examples. ([Lermen et al., 2024](https://arxiv.org/abs/2310.20624)) This is why placing models behind APIs makes sense, as it prevents unauthorized fine-tuning without the company's consent.
 
-**Tamper-Resistant Safeguards as a research direction.** Research into tamper-resistant safeguards, such as the TAR method, aims to make safety mechanisms (like refusal or knowledge restriction) robust against such fine-tuning attacks.X42 TAR has shown promise in resisting extensive fine-tuning while preserving general capabilities, though fundamental limitations in defending against sophisticated attacks exploiting benign variations remain.X42
+**Tamper-Resistant Safeguards as a research direction.** Research into tamper-resistant safeguards, such as the TAR method, aims to make safety mechanisms (like refusal or knowledge restriction) robust against such fine-tuning attacks.X42 TAR has shown promise in resisting extensive fine-tuning while preserving general capabilities, though fundamental limitations in defending against sophisticated attacks exploiting benign variations remain.X42 TODO: check this
 
 \!\!\! quote  "Anthropic ([Anthropic, 2023](https://www-cdn.anthropic.com/1adf000c8f675958c2ee23805d91aaade1cd4613/responsible-scaling-policy.pdf))"
 
@@ -185,30 +185,30 @@ A major challenge for open-weight models is that adversaries can fine-tune them 
 
 ### **Evaluation and Verification**
 
-**The necessity of model evaluation.** The first step in this strategy is to identify which models are considered dangerous and which are not via model evaluation. The paper Model Evaluation for Extreme Risks ([Shevlane et al., 2023](https://arxiv.org/abs/2305.15324))  lists a few critical, dangerous capabilities that need to be assessed. Before deploying powerful models, developers (or third parties) should evaluate them for specific dangerous capabilities, such as the ability to assist in cyberattacks or bioweapon design.X96 These evaluations inform decisions about deployment and necessary safeguards.X96
+**The necessity of model evaluation.** The first step in this strategy is to identify which models are considered dangerous and which are not via model evaluation. The paper Model Evaluation for Extreme Risks ([Shevlane et al., 2023](https://arxiv.org/abs/2305.15324)) lists a few critical, dangerous capabilities that need to be assessed. Before deploying powerful models, developers (or third parties) should evaluate them for specific dangerous capabilities, such as the ability to assist in cyberattacks or bioweapon design.X96 These evaluations inform decisions about deployment and necessary safeguards.X96
 
-**Red Teaming can help assess if these measures are sufficient.** During red teaming, internal teams try to exploit weaknesses in the system to improve its security. They should test whether a hypothetical malicious user can get a sufficient amount of bits of advice from the model without getting caught.
+**Red Teaming can help assess if the mitigations are sufficient.** During red teaming, internal teams try to exploit weaknesses in the system to improve its security. They should test whether a hypothetical malicious user can get a sufficient amount of bits of advice from the model without getting caught.
 
   - For more information, you can read the Evaluations Chapter.
 
 **Box: A possible emerging challenge: Distributed Training and Governance Implications**
 
-The rise of distributed training techniques, enabling LLMs to be trained across multiple, geographically dispersed compute clusters with low communication overhead (e.g., DiLoCo 30), presents new challenges and opportunities for misuse prevention and governance.
+The rise of distributed training techniques, enabling LLMs to be trained across multiple, geographically dispersed compute clusters with low communication overhead (e.g., DiLoCo X30), presents new challenges and opportunities for misuse prevention and governance.
 
   - **It might be possible in the future to train and serve models in a distributed way.** Methods like DiLoCo allow training large models without massive, centralized data centers, using techniques inspired by federated learning.X127 Frameworks like OpenDiLoCo demonstrate feasibility across continents.X30
   - **Policy Implications:** Distributed training could democratize AI development by lowering infrastructure barriers.X127 However, it significantly complicates compute-based governance strategies (like KYC for compute providers or monitoring large data centers) that assume centralized training.X127 It makes tracking and controlling who is training powerful models much harder, potentially increasing proliferation risks if effective governance mechanisms are not adapted.X129
 
 ## **Strategy B: Defense Acceleration (d/acc)**
 
-An alternative or complementary approach focuses on using AI to strengthen defenses against misuse, rather than solely restricting offensive capabilities. Also, the above framework assumes that dangerous AIs are closed behind APIs and require a certain amount of centralization.
+The above framework assumes that dangerous AIs are closed behind APIs and require a certain amount of centralization. An alternative or complementary approach focuses on using AI to strengthen defenses against misuse, rather than solely restricting offensive capabilities.
 
-**However, centralization can also pose systemic risks** ([Kapoor et al., 2024](https://arxiv.org/abs/2403.07918)**).** There's a trade-off between securing models behind APIs to control misuse and the risks of over-centralization ([Cihon et al., 2020](https://arxiv.org/abs/2001.03573)). For instance, if in 20 years all companies worldwide rely on a single company's API, significant risks of value lock-in or fragility could arise because the whole world would be dependent on the political opinion of this model. The stability or instability of this API could be a single point of failure, without talking about power concentrations.
+**Centralization can also pose systemic risks** ([Kapoor et al., 2024](https://arxiv.org/abs/2403.07918)**).** There's a trade-off between securing models behind APIs to control misuse and the risks of over-centralization ([Cihon et al., 2020](https://arxiv.org/abs/2001.03573)). For instance, if in 20 years all companies worldwide rely on a single company's API, significant risks of value lock-in or fragility could arise because the whole world would be dependent on the political opinion of this model. The stability or instability of this API could be a single point of failure, without talking about power concentrations.
 
-**Another possible paradigm is that AIs should be open and decentralized.** Yes, if models are open-sourced, we have to acknowledge that not all AIs will be used for good, just as we have to acknowledge that there are disturbed individuals who commit horrific acts of violence. Even if AIs are instruction-tuned before open-sourcing, it's possible to remove security barriers very easily ([Lermen et al., 2024](https://arxiv.org/abs/2310.20624)), as we've seen earlier. This means that some people will misuse AI, and we need to prepare for that. For example, we would need to create more defenses in existing infrastructures. An example of defense would be to use models to iterate on all the world's open-source code to find security flaws so that good actors rather than malicious actors find security flaws. Another example would be to use the model to find holes in the security of the bioweapons supply chain and correct those problems.
+**Another possible paradigm is that AIs should be open and decentralized.** Yes, if models are open-sourced, we have to acknowledge that not all AIs will be used for good: even if AIs are instruction-tuned before open-sourcing, it's possible to remove security barriers very easily ([Lermen et al., 2024](https://arxiv.org/abs/2310.20624)), as we've seen earlier. This means that some people will misuse AI, and we need to prepare for that. For example, we would need to create more defenses in existing infrastructures. An example of defense would be to use models to iterate on all the world's open-source code to find security flaws so that good actors rather than malicious actors find security flaws. Another example would be to use the model to find holes in the security of the bioweapons supply chain and correct those problems.
 
 **Defense acceleration.** Defense acceleration, or d/acc, is a framework popularized by Vitalik Buterin ([Buterin, 2023](https://vitalik.eth.limo/general/2023/11/27/techno_optimism.html)). d/acc is a strategic approach focusing on promoting technologies and innovations that inherently favor defense over offense. This strategy emphasizes developing and accelerating technologies that protect individuals, societies, and ecosystems from various threats rather than technologies that could be used for aggressive or harmful purposes. It's like vaccinating society against the potential downsides of our advancements. d/acc would also be a plausible strategy for maintaining freedom and privacy. It's a bit like ensuring everyone has a strong enough lock on their doors; if breaking in is tough, there's less chaos and crime. This is crucial for ensuring that technological advancements don't lead to dystopian scenarios where surveillance and control are rampant.
 
-**A concrete example: AI for Cybersecurity Defense:** A key application is using AI to improve cybersecurity.X117 Powerful AI could potentially automate vulnerability detection, monitor systems for intrusions, manage fine-grained permissions more effectively than humans, or displace human operators from security-critical tasks.X120 While current models may not yet be reliable enough X121, the potential exists for AI to significantly bolster cyber defenses against both conventional and AI-driven attacks.X122  Also, [Access to powerful AI might make computer security radically easier](https://www.alignmentforum.org/posts/2wxufQWK8rXcDGbyL/access-to-powerful-ai-might-make-computer-security-radically).
+**A concrete example: AI for Cybersecurity Defense:** A key application is using AI to improve cybersecurity.X117 Powerful AI could potentially automate vulnerability detection, monitor systems for intrusions, manage fine-grained permissions more effectively than humans, or displace human operators from security-critical tasks.X120 While current models may not yet be reliable enough X121, the potential exists for AI to significantly bolster cyber defenses against both conventional and AI-driven attacks.X122 ([Schlegeris, 2024](https://www.alignmentforum.org/posts/2wxufQWK8rXcDGbyL/access-to-powerful-ai-might-make-computer-security-radically)) outlines four promising strategies for using AI to enhance security: comprehensive monitoring of human actions with AI flagging suspicious activities; trust displacement where AI handles sensitive tasks instead of humans; fine-grained permission management that would be too labor-intensive for humans; and AI-powered investigation of suspicious activities. These approaches could dramatically reduce insider threats and data exfiltration risks, potentially making computer security "radically easier" when powerful AI becomes available.
 
 [](https://lh7-rt.googleusercontent.com/docsz/AD_4nXdYKIqsz5ov3RyBn7nhz0Q2pANYodQnZqM70tIODbxdF7KaWcl8gk5cVGe5zXuMcuA2hGCMNmE0_TK63iCKSb_Ndffx5YJ-B-EaapaUZCDCerBhUlkD9IkidWE5jKF3PNGAbX3FfQ?key=ii_Tx8rTP8MI8IGRzgDFwL-E)
 
@@ -228,19 +228,17 @@ In the case of AI, sharing the most potent models may pose extreme risks that co
 
 The current balance for sharing frontier models remains uncertain; it has been clearly positive so far, but deploying increasingly powerful models could tip this balance towards unacceptable levels of risk. [^2]
 
-The dangers emerging from frontier AI are nascent, and the harms they pose are not yet extreme. That said, as we stand at the dawn of a new technological era with increasingly capable frontier AI, we are seeing signals of new dangerous capabilities. We must pay attention to these signals. Once more extreme harms start occurring, it might be too late to start thinking about standards and regulations to ensure safe model release. It is essential to exercise caution and discernment now.
+The dangers emerging from frontier AI are nascent, and the harms they pose are not yet extreme. That said, as we stand at the dawn of a new technological era with increasingly capable frontier AI, we are seeing signals of new dangerous capabilities. We must pay attention to these signals. Once more extreme harms start occurring, it might be too late to start thinking about standards and regulations to ensure safe model release.
 
 \</tab\>
 
 The d/acc philosophy requires more research, as it's not clear that the offense-defense balance is positive before open-sourcing dangerous AIs, as open-sourcing is irreversible.
 
-For a short review of different positions on open source, we recommend reading The Promise and Peril of Artificial Intelligence ([Titus & Russell, 2023](https://arxiv.org/abs/2308.14253)).
-
 \!\!\! quote  "Ajeya Cotra ([Piper, 2024](https://www.vox.com/future-perfect/2024/2/2/24058484/open-source-artificial-intelligence-ai-risk-meta-llama-2-chatgpt-openai-deepfake))"
 
 \<tab\>
 
-Most systems that are too dangerous to open source are probably too dangerous to be trained at all given the kind of practices that are common in labs today, where it’s very plausible they’ll leak, or very plausible they’ll be stolen, or very plausible if they’re [available] over an API they could cause harm.
+Most systems that are too dangerous to open source are probably too dangerous to be trained at all given the kind of practices that are common in labs today, where it’s very plausible they’ll leak, or very plausible they’ll be stolen, or very plausible if they’re available over an API they could cause harm.
 
 \</tab\>
 
@@ -251,9 +249,11 @@ The debate over whether to release powerful foundation models openly (making wei
   - **Arguments for Openness:** Proponents emphasize accelerated innovation, broader access, increased transparency and auditability, and the distribution of power away from large labs.X125 Openness is seen as vital for independent safety research and development of defenses.X124 Some researchers argues that attempting to suppress open source is futile and counterproductive, as models will emerge anyway, and openness fosters societal awareness.X135
   - **Arguments for Closure (Risks of Openness):** Critics highlight the increased risk of misuse, as adversaries can easily remove safeguards, fine-tune models for harmful purposes (e.g., generating misinformation, aiding cyberattacks or bioweapon design), and exploit vulnerabilities more effectively with white-box access.X133 Open sourcing also facilitates the proliferation of models with inherent flaws (bias, security vulnerabilities) and makes it difficult to ensure safety updates are applied downstream.X133 Some argue the offense-defense balance for AI knowledge favors offense, making publication risky.X136 GovAI suggests extreme risks may outweigh benefits for highly capable models.X132
   - **Marginal Risk Assessment:** Some researchers argue that policy decisions should focus on the *marginal risk* of open models compared to closed models or existing technologies (like the internet).X137 They contend that evidence for significantly higher marginal risk from open models is currently limited for many misuse vectors (except perhaps CSAM/NCII).X138
-  - **Alternative Release Strategies:** Given the tradeoffs, alternatives like staged release X140, gated access with KYC X133, research APIs X133, and trusted partnerships X133 are proposed to capture some benefits of openness while mitigating risks. Capability restrictions, while blunt, may be warranted in some cases.X141
+  - **Alternative Release Strategies:** Given the tradeoffs, alternatives like staged release X140, gated access with KYC X133, research APIs X133, and trusted partnerships X133 TODO: Check are proposed to capture some benefits of openness while mitigating risks.
 
 **Table 1: Open vs. Closed Foundation Models: A Comparative Overview**
+
+TODO: Check
 
 | **Feature** | **Open Models (Weights Available)** | **Closed Models (API Access)** | **Mitigation Strategies (Open)** | **Mitigation Strategies (Closed)** |
 | --- | --- | --- | --- | --- |
@@ -280,7 +280,7 @@ Strategy B: Defense Acceleration
 
   - Finally, **investing in resilience** by providing public compute resources conditional on safety practices, building model-sharing infrastructure, and funding countermeasures can strengthen the overall defense against AI-enabled biothreats.
 
-**Strategy X: Organizational safety**
+Strategy X: Organizational safety TODO: remove X, grasp
 
   - **Responsible development** practices should be expanded, potentially including licensing for high-risk biological design tools and increased liability for developers. These measures could be complemented by voluntary commitments and refined publication norms within the AI community.
   - The next step is a thorough **risk assessment**. This involves evaluating AI models for potentially dangerous bio-capabilities and red teaming biological design tools to identify vulnerabilities and weaknesses.
@@ -300,9 +300,9 @@ The primary solution is to regulate and establish strict norms against this type
 4.  **Education and awareness:** Launch public education campaigns about the risks of deep fakes, misinformation, and AI privacy threats. Teach people to be critical consumers of online content.
 5.  **Research:** Support research into technical methods of detecting AI-generated content, identifying manipulated media, and preserving privacy from AI systems.
 
-Another possibility is to accelerate the defensive deployment of AI. For instance, AI-powered systems can screen phone calls in real-time, analyzing voice patterns, call frequency, and conversational cues to identify likely scams and alert users or block calls.X145 Chatbots like Daisy X148 and services like Jolly Roger Telephone X151 employ AI to engage scammers in lengthy, unproductive conversations, wasting their time and diverting them from potential victims. These represent practical, defense-oriented applications of AI against common forms of misuse.
+Another possibility is to accelerate the defensive deployment of AI. For instance, AI-powered systems can screen phone calls in real-time, analyzing voice patterns, call frequency, and conversational cues to identify likely scams and alert users or block calls.X145 Chatbots like Daisy X148 and services like Jolly Roger Telephone X151 employ AI to engage scammers in lengthy, unproductive conversations, wasting their time and diverting them from potential victims. These represent practical, defense-oriented applications of AI against common forms of misuse. But this is only an early step and this is far from being sufficient.
 
-Ultimately, a combination of legal frameworks, platform policies, social norms, and technological tools will be needed to mitigate the risks posed by widely available AI models. Regulation, accountability, and shifting cultural attitudes will be critical.
+Ultimately, a combination of legal frameworks, platform policies, social norms, and technological tools will be needed to mitigate the risks posed by widely available AI models.
 
 # **5. AGI Safety**
 
