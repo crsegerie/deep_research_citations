@@ -200,13 +200,7 @@ def split_the_body(body_text, custom_string):
     
     return body, sources
 
-@backoff.on_exception(
-    backoff.constant,  # Use constant backoff for Gemini API
-    Exception,  # This will catch any Gemini API errors
-    interval=60,  # Wait 60 seconds between retries
-    max_tries=3,
-    jitter=backoff.full_jitter
-)
+
 def add_x_to_source_numbers(text, api_key):
     """
     Use Gemini 2.5 Pro to add an X before source reference numbers in text.
@@ -223,7 +217,7 @@ def add_x_to_source_numbers(text, api_key):
     {text}
     """
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-pro")
+    model = genai.GenerativeModel("gemini-2.5-pro-exp-03-25")
     
     # Basic rate limiting for Gemini API
     time.sleep(4)
@@ -247,12 +241,12 @@ with st.expander("Instructions", expanded=True):
     """)
 
 # Input options
-tab1, tab2 = st.tabs(["Direct Text Input", "File Upload"])
+tab1 = st.tabs(["Direct Text Input"])[0]
 
 with tab1:
     body_text = st.text_area("Input Body (Paste your research text here), in markdown format, with the references at the end of the text", height=300)
     reference_marker = st.text_input("Reference Section Marker", value="Sources des citations")
-    preprocess_text = st.checkbox("Preprocess text to add 'X' before source numbers", value=True, help="Uses Gemini to add an 'X' before source numbers to make them easier to identify")
+    preprocess_text = True
     
     if st.button("Process Text", disabled=not api_key):
         if body_text:
@@ -263,7 +257,10 @@ with tab1:
                 # Preprocess body to add X before source numbers if requested
                 if preprocess_text:
                     with st.spinner("Preprocessing text with Gemini..."):
+                        original_lines = body.count('\n') + 1
                         body = add_x_to_source_numbers(body, api_key)
+                        processed_lines = body.count('\n') + 1
+                        assert processed_lines >= original_lines, "Gemini preprocessing should not reduce number of lines"
                 
                 # Process sources
                 if sources:
@@ -283,49 +280,4 @@ with tab1:
                 else:
                     st.error(f"Could not find the reference marker '{reference_marker}' in the text.")
         else:
-            st.error("Please enter input text.")
-
-with tab2:
-    uploaded_file = st.file_uploader("Upload a Markdown File", type=["md", "txt"])
-    reference_marker = st.text_input("Reference Section Marker ", value="Sources des citations")
-    preprocess_text = st.checkbox("Preprocess file to add 'X' before source numbers", value=True, help="Uses Gemini to add an 'X' before source numbers to make them easier to identify")
-    
-    if uploaded_file is not None and st.button("Process File", disabled=not api_key):
-        with st.spinner("Processing file..."):
-            # Create a temporary file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".md") as temp_file:
-                temp_file.write(uploaded_file.getvalue())
-                temp_path = temp_file.name
-            
-            # Read the file
-            with open(temp_path, 'r') as file:
-                file_content = file.read()
-            
-            # Split the body
-            body, sources = split_the_body(file_content, reference_marker)
-            
-            # Preprocess body to add X before source numbers if requested
-            if preprocess_text:
-                with st.spinner("Preprocessing text with Gemini..."):
-                    body = add_x_to_source_numbers(body, api_key)
-                
-            # Process sources
-            if sources:
-                formatted_sources, author_years = extract_urls_from_text(sources, api_key)
-                
-                # Replace references in body
-                formatted_body = replace_sources_with_author_year(body, author_years)
-                
-                # Display results
-                st.subheader("Formatted Body")
-                st.text_area("Formatted Body Content", value=formatted_body, height=300)
-                st.download_button("Download Formatted Body", formatted_body, "output_body.md")
-                
-                st.subheader("Formatted Sources")
-                st.text_area("Formatted Sources", value=formatted_sources, height=300)
-                st.download_button("Download Formatted Sources", formatted_sources, "output_sources.md")
-            else:
-                st.error(f"Could not find the reference marker '{reference_marker}' in the text.")
-            
-            # Clean up temporary file
-            os.unlink(temp_path) 
+            st.error("Please enter input text.") 
